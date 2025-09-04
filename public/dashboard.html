@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dashboard Zabbix - CCM Tecnologia</title>
+  <!-- Fonte moderna: Inter via Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    /* Reset básico */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    /* Corpo da página com fundo em gradiente e imagem cósmica */
+    body, html {
+      height: 100%;
+      font-family: 'Inter', sans-serif;
+      color: white;
+      background: 
+        linear-gradient(180deg, #000011 0%, #001f3f 100%),
+        url('https://images.unsplash.com/photo-1506318137071-a29ae3d0783c?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80') no-repeat center center fixed;
+      background-size: cover;
+      position: relative;
+      overflow-x: hidden;
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+
+    /* Overlay escuro para melhor legibilidade */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: -1;
+    }
+
+    /* Container principal centralizado */
+    .container {
+      max-width: 600px;
+      width: 100%;
+      background: rgba(0, 20, 40, 0.8);
+      border-radius: 16px;
+      padding: 2.5rem;
+      box-shadow: 0 8px 32px rgba(0, 150, 255, 0.2);
+      backdrop-filter: blur(10px);
+      z-index: 2;
+    }
+
+    /* Cabeçalho com título */
+    header h1 {
+      font-weight: 700;
+      font-size: 2.5rem;
+      color: #cce6ff;
+      text-shadow: 0 0 8px #3399ff99;
+      margin-bottom: 1.5rem;
+      text-align: center;
+    }
+
+    /* Formulário */
+    .form-section {
+      margin-bottom: 1.5rem;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+      color: #a0d8ff;
+    }
+
+    select, input {
+      width: 100%;
+      padding: 0.75rem;
+      border-radius: 8px;
+      border: 1.5px solid #0057b7;
+      background-color: rgba(0, 10, 20, 0.8);
+      color: white;
+      font-family: 'Inter', sans-serif;
+      transition: all 0.3s ease;
+    }
+
+    select:focus, input:focus {
+      outline: none;
+      border-color: #3399ff;
+      box-shadow: 0 0 10px rgba(51, 153, 255, 0.5);
+    }
+
+    /* Botões */
+    .btn {
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 1rem;
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      border: none;
+      color: white;
+      transition: all 0.3s ease;
+      outline-offset: 3px;
+    }
+
+    .btn-pdf {
+      background: linear-gradient(135deg, #0057b7, #3399ff);
+      box-shadow: 0 4px 8px rgba(51, 153, 255, 0.6);
+      width: 100%;
+      margin-bottom: 1rem;
+    }
+
+    .btn-pdf:hover {
+      background: linear-gradient(135deg, #3399ff, #66b2ff);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 12px rgba(51, 153, 255, 0.9);
+    }
+
+    .btn-cancel {
+      background: #800000;
+      width: 48%;
+    }
+
+    .btn-confirm {
+      background: #0057b7;
+      width: 48%;
+    }
+
+    .btn-group {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    /* Responsividade */
+    @media (max-width: 480px) {
+      .container {
+        padding: 1.5rem;
+      }
+      header h1 {
+        font-size: 2rem;
+      }
+      .btn-cancel, .btn-confirm {
+        width: 48%;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container" role="main">
+    <header>
+      <h1>Dashboard Zabbix</h1>
+    </header>
+
+    <!-- Botão Principal: Gerar PDF -->
+    <button class="btn btn-pdf" id="generatePDF">Gerar PDF</button>
+
+    <!-- Formulário de Configuração do PDF -->
+    <div id="pdfForm" style="display: none;">
+      <h2>Configurar Relatório</h2>
+
+      <!-- Passo 1: Selecionar Grupo -->
+      <div class="form-section">
+        <label for="hostGroup">Grupo de Hosts:</label>
+        <select id="hostGroup" onchange="loadHosts()">
+          <option value="">Carregando grupos...</option>
+        </select>
+      </div>
+
+      <!-- Passo 2: Selecionar Host (um ou todos) -->
+      <div class="form-section">
+        <label for="host">Host:</label>
+        <select id="host">
+          <option value="">Selecione um grupo primeiro</option>
+        </select>
+      </div>
+
+      <!-- Passo 3: Selecionar Gráficos -->
+      <div class="form-section">
+        <label for="graphs">Gráficos:</label>
+        <select id="graphs" multiple size="6"></select>
+      </div>
+
+      <!-- Passo 4: Período -->
+      <div class="form-section">
+        <label for="period">Período:</label>
+        <select id="period">
+          <option value="3600">Última hora</option>
+          <option value="86400">Últimas 24 horas</option>
+          <option value="604800">Últimos 7 dias</option>
+          <option value="2592000">Últimos 30 dias</option>
+        </select>
+      </div>
+
+      <!-- Botões de ação -->
+      <div class="btn-group">
+        <button class="btn btn-cancel" id="cancelPDF">Cancelar</button>
+        <button class="btn btn-confirm" id="confirmPDF">Gerar PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Logotipo CCM no canto inferior direito -->
+  <div class="logo-ccm" aria-hidden="true" title="Logotipo CCM">
+    CCM
+  </div>
+
+  <script>
+    // Token armazenado no localStorage
+    const auth = localStorage.getItem('zabbix_auth');
+    if (!auth) {
+      window.location.href = '/index.html';
+    }
+
+    // Carregar grupos de hosts
+    async function loadHostGroups() {
+      try {
+        const response = await fetch('/api/hostgroups', {
+          headers: { 'x-zabbix-auth': auth }
+        });
+        const data = await response.json();
+        const select = document.getElementById('hostGroup');
+        select.innerHTML = '<option value="">Selecione um grupo</option>';
+        data.forEach(group => {
+          const option = document.createElement('option');
+          option.value = group.name;
+          option.textContent = group.name;
+          select.appendChild(option);
+        });
+      } catch (error) {
+        console.error('Erro ao carregar grupos:', error);
+        alert('Falha ao carregar grupos de hosts.');
+      }
+    }
+
+    // Carregar hosts do grupo selecionado
+    async function loadHosts() {
+  const group = document.getElementById('hostGroup').value;
+  if (!group) return;
+
+  try {
+    const response = await fetch(`/api/hosts?group=${encodeURIComponent(group)}`, {
+      headers: { 'x-zabbix-auth': auth }
+    });
+    const data = await response.json();
+    const select = document.getElementById('host');
+    select.innerHTML = '<option value="all">✅ Todos os hosts do grupo</option>';
+    
+    data.forEach(host => {
+      const option = document.createElement('option');
+      option.value = host.host;
+      option.textContent = host.host;
+      select.appendChild(option);
+    });
+  } catch (error) {
+    console.error('Erro ao carregar hosts:', error);
+    alert('Falha ao carregar hosts.');
+  }
+}
+
+    // Carregar gráficos disponíveis
+    async function loadGraphs() {
+      const host = document.getElementById('host').value;
+      if (!host || host === 'all') return;
+
+      try {
+        const response = await fetch(`/api/graphs?host=${encodeURIComponent(host)}`, {
+          headers: { 'x-zabbix-auth': auth }
+        });
+        const data = await response.json();
+        const select = document.getElementById('graphs');
+        select.innerHTML = '';
+        data.forEach(graph => {
+          const option = document.createElement('option');
+          option.value = graph.graphid;
+          option.textContent = graph.name;
+          select.appendChild(option);
+        });
+      } catch (error) {
+        console.error('Erro ao carregar gráficos:', error);
+        alert('Falha ao carregar gráficos.');
+      }
+    }
+
+    // Eventos
+    document.getElementById('generatePDF').addEventListener('click', () => {
+      document.getElementById('pdfForm').style.display = 'block';
+      loadHostGroups(); // Carrega os grupos ao abrir o formulário
+    });
+
+    document.getElementById('host').addEventListener('change', () => {
+      const host = document.getElementById('host').value;
+      if (host && host !== 'all') {
+        loadGraphs();
+      } else {
+        document.getElementById('graphs').innerHTML = '';
+      }
+    });
+
+    document.getElementById('cancelPDF').addEventListener('click', () => {
+      document.getElementById('pdfForm').style.display = 'none';
+    });
+
+    document.getElementById('confirmPDF').addEventListener('click', () => {
+      const group = document.getElementById('hostGroup').value;
+      const host = document.getElementById('host').value;
+      const graphs = Array.from(document.getElementById('graphs').selectedOptions).map(opt => opt.value);
+      const period = document.getElementById('period').value;
+
+      if (!group) {
+        alert('Selecione um grupo.');
+        return;
+      }
+
+      if (!host) {
+        alert('Selecione um host ou "Todos os hosts do grupo".');
+        return;
+      }
+
+      if (host !== 'all' && graphs.length === 0) {
+        alert('Selecione pelo menos um gráfico.');
+        return;
+      }
+
+      // Aqui virá a chamada para gerar o PDF
+      const tipo = host === 'all' ? 'Grupo' : 'Host Individual';
+      alert(`PDF será gerado para:\nTipo: ${tipo}\nGrupo: ${group}\nHost: ${host === 'all' ? 'Todos' : host}\nGráficos: ${graphs.length}\nPeríodo: ${period}s`);
+    });
+  </script>
+
+  <style>
+    .logo-ccm {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      font-weight: 900;
+      font-size: 1.6rem;
+      font-family: 'Inter', sans-serif;
+      color: white;
+      user-select: none;
+      letter-spacing: 0.2em;
+      text-shadow: 0 0 4px #66b2ff88;
+      cursor: default;
+      transform: skew(-15deg);
+      background: transparent;
+      padding: 6px 12px;
+      border-radius: 6px;
+      box-shadow: 0 0 14px #3399ff88;
+      z-index: 10;
+    }
+  </style>
+</body>
+</html>
