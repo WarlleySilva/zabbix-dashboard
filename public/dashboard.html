@@ -170,15 +170,15 @@
       <!-- Passo 2: Selecionar Host (um ou todos) -->
       <div class="form-section">
         <label for="host">Host:</label>
-        <select id="host">
+        <select id="host" onchange="loadGraphs()">
           <option value="">Selecione um grupo primeiro</option>
         </select>
       </div>
 
       <!-- Passo 3: Selecionar Gráficos -->
       <div class="form-section">
-        <label for="graphs">Gráficos:</label>
-        <select id="graphs" multiple size="6"></select>
+        <label for="graphs">Selecione os Gráficos:</label>
+        <select id="graphs" multiple size="6" style="height: auto; width: 100%;"></select>
       </div>
 
       <!-- Passo 4: Período -->
@@ -235,33 +235,36 @@
 
     // Carregar hosts do grupo selecionado
     async function loadHosts() {
-  const group = document.getElementById('hostGroup').value;
-  if (!group) return;
+      const group = document.getElementById('hostGroup').value;
+      if (!group) return;
 
-  try {
-    const response = await fetch(`/api/hosts?group=${encodeURIComponent(group)}`, {
-      headers: { 'x-zabbix-auth': auth }
-    });
-    const data = await response.json();
-    const select = document.getElementById('host');
-    select.innerHTML = '<option value="all">✅ Todos os hosts do grupo</option>';
-    
-    data.forEach(host => {
-      const option = document.createElement('option');
-      option.value = host.host;
-      option.textContent = host.host;
-      select.appendChild(option);
-    });
-  } catch (error) {
-    console.error('Erro ao carregar hosts:', error);
-    alert('Falha ao carregar hosts.');
-  }
-}
+      try {
+        const response = await fetch(`/api/hosts?group=${encodeURIComponent(group)}`, {
+          headers: { 'x-zabbix-auth': auth }
+        });
+        const data = await response.json();
+        const select = document.getElementById('host');
+        select.innerHTML = '<option value="all">✅ Todos os hosts do grupo</option>';
+        
+        data.forEach(host => {
+          const option = document.createElement('option');
+          option.value = host.host;
+          option.textContent = host.host;
+          select.appendChild(option);
+        });
+      } catch (error) {
+        console.error('Erro ao carregar hosts:', error);
+        alert('Falha ao carregar hosts.');
+      }
+    }
 
     // Carregar gráficos disponíveis
     async function loadGraphs() {
       const host = document.getElementById('host').value;
-      if (!host || host === 'all') return;
+      if (!host || host === 'all') {
+        document.getElementById('graphs').innerHTML = '';
+        return;
+      }
 
       try {
         const response = await fetch(`/api/graphs?host=${encodeURIComponent(host)}`, {
@@ -270,6 +273,7 @@
         const data = await response.json();
         const select = document.getElementById('graphs');
         select.innerHTML = '';
+
         data.forEach(graph => {
           const option = document.createElement('option');
           option.value = graph.graphid;
@@ -288,20 +292,11 @@
       loadHostGroups(); // Carrega os grupos ao abrir o formulário
     });
 
-    document.getElementById('host').addEventListener('change', () => {
-      const host = document.getElementById('host').value;
-      if (host && host !== 'all') {
-        loadGraphs();
-      } else {
-        document.getElementById('graphs').innerHTML = '';
-      }
-    });
-
     document.getElementById('cancelPDF').addEventListener('click', () => {
       document.getElementById('pdfForm').style.display = 'none';
     });
 
-    document.getElementById('confirmPDF').addEventListener('click', () => {
+    document.getElementById('confirmPDF').addEventListener('click', async () => {
       const group = document.getElementById('hostGroup').value;
       const host = document.getElementById('host').value;
       const graphs = Array.from(document.getElementById('graphs').selectedOptions).map(opt => opt.value);
@@ -322,9 +317,36 @@
         return;
       }
 
-      // Aqui virá a chamada para gerar o PDF
-      const tipo = host === 'all' ? 'Grupo' : 'Host Individual';
-      alert(`PDF será gerado para:\nTipo: ${tipo}\nGrupo: ${group}\nHost: ${host === 'all' ? 'Todos' : host}\nGráficos: ${graphs.length}\nPeríodo: ${period}s`);
+      // Chamar backend para gerar PDF
+      try {
+        const response = await fetch('/api/generate-pdf', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-zabbix-auth': auth
+          },
+          body: JSON.stringify({ group, host, graphs, period })
+        });
+
+        const data = await response.json();
+
+        if (data.error) {
+          alert('Erro: ' + data.error);
+          return;
+        }
+
+        // Baixar PDF
+        const pdfData = Uint8Array.from(atob(data.pdf), c => c.charCodeAt(0));
+        const blob = new Blob([pdfData], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `relatorio-zabbix-${host === 'all' ? 'grupo' : host}.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch (error) {
+        alert('Erro ao gerar PDF: ' + error.message);
+      }
     });
   </script>
 
